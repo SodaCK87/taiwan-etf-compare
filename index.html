@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>台灣 ETF 成長比較器 - 0050 vs 006208 vs 高股息</title>
+    <meta name="description" content="比較台灣市值型 ETF（0050、006208）與高股息 ETF（0056、00878、00919、00929）的長期資產成長差異，支援設定每月提領金額進行退休規劃模擬。" />
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="bg-orbs" aria-hidden="true"></div>
+
+<div class="app-wrapper">
+
+    <!-- ===== Header ===== -->
+    <header class="app-header">
+        <div class="badge">Taiwan ETF Simulator</div>
+        <h1>台灣 ETF 長期成長比較器</h1>
+        <p>比較市值型與高股息 ETF 在不同提領策略下的資產差異，協助制定退休與財務自由計畫。</p>
+    </header>
+
+    <!-- ===== Control Panel ===== -->
+    <section class="control-panel" aria-label="參數設定">
+        <div class="panel-title">投資參數設定</div>
+
+        <!-- Row 1: Capital + Contribution + Years -->
+        <div class="controls-grid">
+            <div class="form-group">
+                <label for="inp-initial">初始投入資金</label>
+                <div class="input-wrap">
+                    <span class="prefix">NT$</span>
+                    <input type="number" id="inp-initial" value="1000000" min="1" step="10000"
+                           aria-label="初始投入資金（新台幣）" />
+                </div>
+                <span class="hint">一次性投入的本金金額</span>
+            </div>
+
+            <div class="form-group">
+                <label for="inp-monthly-contrib">每月定期投入</label>
+                <div class="input-wrap">
+                    <span class="prefix">NT$</span>
+                    <input type="number" id="inp-monthly-contrib" value="10000" min="0" step="1000"
+                           aria-label="每月定期投入金額（新台幣）" />
+                </div>
+                <span class="hint">0 = 僅一次性投入，不定期追加</span>
+            </div>
+
+            <div class="form-group">
+                <label for="inp-years">模擬年限</label>
+                <div class="slider-wrap">
+                    <div class="slider-header">
+                        <span style="font-size:12px;color:var(--text-muted)">1 年</span>
+                        <span class="slider-value"><span id="lbl-years">20</span><span>年</span></span>
+                        <span style="font-size:12px;color:var(--text-muted)">40 年</span>
+                    </div>
+                    <input type="range" id="inp-years" min="1" max="40" value="20" step="1"
+                           aria-label="模擬年限" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: ETF Selector -->
+        <div class="form-group" style="margin-bottom:24px">
+            <label>選擇比較標的</label>
+            <div class="etf-selector" id="etf-chip-container">
+                <!-- Chips built by JS -->
+            </div>
+        </div>
+
+        <!-- Row 3: Tax Settings -->
+        <div class="panel-title" style="margin-bottom:16px">稅務設定</div>
+
+        <div class="tax-settings-grid">
+            <div class="form-group">
+                <label for="inp-annual-income">個人年應稅所得額</label>
+                <div class="input-wrap">
+                    <span class="prefix">NT$</span>
+                    <input type="number" id="inp-annual-income" value="1200000" min="0" step="10000"
+                           aria-label="個人年應稅所得額（新台幣）" />
+                </div>
+                <span class="hint">扣除免稅額、標準扣除額後的應稅所得，用於計算邊際所得稅級距</span>
+            </div>
+
+            <div class="tax-result-panel" id="tax-result-panel" aria-live="polite" aria-label="股息稅率計算結果">
+                <!-- Rendered by JS updateTaxPanel() -->
+            </div>
+        </div>
+
+        <!-- Row 4: Withdrawal Toggle + Fields -->
+        <div class="panel-title" style="margin-bottom:16px">提領設定</div>
+
+        <label class="withdrawal-toggle" aria-label="啟用提領">
+            <div class="toggle-switch">
+                <input type="checkbox" id="toggle-withdrawal" aria-label="啟用提領模式" />
+                <div class="toggle-track"></div>
+            </div>
+            <span class="toggle-label">啟用定期提領（模擬退休現金流）</span>
+        </label>
+
+        <div class="withdrawal-fields" id="withdrawal-fields">
+            <div class="form-group">
+                <label for="inp-withdrawal">提領金額</label>
+                <div class="input-wrap">
+                    <span class="prefix">NT$</span>
+                    <input type="number" id="inp-withdrawal" value="30000" min="0" step="1000"
+                           aria-label="每期提領金額" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="sel-withdrawal-mode">提領頻率</label>
+                <select id="sel-withdrawal-mode" aria-label="提領頻率">
+                    <option value="monthly">每月提領</option>
+                    <option value="annually">每年提領</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-run" id="btn-run" aria-label="開始模擬">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            開始模擬
+        </button>
+    </section>
+
+    <!-- ===== Chart Section ===== -->
+    <section class="chart-section" aria-label="成長曲線圖">
+        <div class="chart-header">
+            <div class="chart-title-group">
+                <h2>資產成長曲線</h2>
+                <p>基於歷史年化報酬率假設，含股息再投入（DRIP）</p>
+            </div>
+            <div class="chart-tabs" role="tablist" aria-label="圖表類型">
+                <button class="chart-tab active" data-mode="portfolio" role="tab" aria-selected="true">總資產</button>
+                <button class="chart-tab" data-mode="profit" role="tab" aria-selected="false">累計獲利</button>
+                <button class="chart-tab" data-mode="growth" role="tab" aria-selected="false">報酬率 %</button>
+            </div>
+        </div>
+        <div class="chart-container" role="img" aria-label="ETF 資產成長曲線圖">
+            <canvas id="growth-chart"></canvas>
+        </div>
+    </section>
+
+    <!-- ===== Stats Cards ===== -->
+    <section id="stats-section" class="stats-section" style="display:none" aria-label="各標的統計摘要">
+        <h2>各標的摘要</h2>
+        <div class="stats-grid" id="stats-grid"></div>
+    </section>
+
+    <!-- ===== Comparison Table ===== -->
+    <section id="table-section" class="table-section" style="display:none" aria-label="比較排名表">
+        <h2>排名比較表（依最終資產排序）</h2>
+        <table class="comparison-table" aria-label="ETF 最終資產比較">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>標的名稱</th>
+                    <th>年化報酬率 (IRR)</th>
+                    <th>毛配息殖利率</th>
+                    <th>資料年限</th>
+                    <th>總投入本金</th>
+                    <th>總稅費成本</th>
+                    <th>ROI</th>
+                    <th>最終資產</th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
+    </section>
+
+    <!-- ===== Disclaimer ===== -->
+    <div class="disclaimer" role="note" aria-label="免責聲明">
+        <svg class="disclaimer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>
+            <strong>免責聲明：</strong>本工具所採用之年化報酬率為基於各 ETF 公開歷史資料之估算值，
+            並非保證未來報酬。過去績效不代表未來表現。本工具僅供財務教育與規劃參考，
+            不構成任何投資建議。實際投資前請諮詢合格財務顧問。
+            所有費用率、殖利率數據均以官方公開說明書為依據並定期更新。
+        </p>
+    </div>
+
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
